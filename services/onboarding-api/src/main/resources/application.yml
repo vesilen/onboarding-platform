@@ -14,6 +14,9 @@ management:
     health:
       probes:
         enabled: true   # /actuator/health/liveness and /readiness, used later by Azure
+  info:
+    env:
+      enabled: true
 info:
   app:
     description: This is the bank onboarding api
