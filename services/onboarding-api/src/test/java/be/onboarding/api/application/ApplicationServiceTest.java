@@ -9,7 +9,8 @@ class ApplicationServiceTest {
 
     private static final UUID FIXED_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
-    private final ApplicationService service = new ApplicationService(() -> FIXED_ID);
+    private final ApplicationService service =
+        new ApplicationService(() -> FIXED_ID, new KycProperties("test-key"));
 
     @Test
     void submitAssignsIdAndMarksApplicationAsReceived() {
