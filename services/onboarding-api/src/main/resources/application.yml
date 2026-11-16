@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: onboarding-api
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true   # /actuator/health/liveness and /readiness, used later by Azure

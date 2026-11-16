@@ -1,0 +1,14 @@
+# Normalise line endings in the repo; check out with the OS default.
+* text=auto
+
+# Shell scripts must keep LF, or they break on the Linux CI runners.
+*.sh   text eol=lf
+mvnw   text eol=lf
+
+# Windows scripts keep CRLF.
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+
+# Binaries
+*.jar  binary
+*.png  binary
