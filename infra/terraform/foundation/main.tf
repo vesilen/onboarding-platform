@@ -17,7 +17,7 @@ locals {
 }
 
 resource "azurerm_user_assigned_identity" "api" {
-  name                = "id-${var.workload}-${var.environment}-${var.region_abbr}" # id-ivaninterview-dev-bec
+  name                = "id-${var.workload}-api-${var.environment}-${var.region_abbr}" # id-ivaninterview-api-dev-bec
   location            = data.azurerm_resource_group.this.location
   resource_group_name = data.azurerm_resource_group.this.name
   tags                = local.tags
@@ -69,4 +69,18 @@ resource "azurerm_key_vault_secret" "kyc_api_key" {
   key_vault_id = azurerm_key_vault.this.id
 
   depends_on = [azurerm_role_assignment.deployer_secrets_officer]
+}
+
+# Identity of the onboarding-processor Function. Separate from the API identity (least privilege:
+# the API may only send, the Function may only receive). Kept overnight like the API identity, so the
+# role assignments that app/ recreates every morning always point to the same principal_id.
+resource "azurerm_user_assigned_identity" "func" {
+  name                = "id-${var.workload}-func-${var.environment}-${var.region_abbr}" # id-ivaninterview-func-dev-bec
+  location            = data.azurerm_resource_group.this.location
+  resource_group_name = data.azurerm_resource_group.this.name
+  tags                = local.tags
+
+  lifecycle {
+    prevent_destroy = true # remove this line before the final cleanup (expiry)
+  }
 }
