@@ -2,21 +2,14 @@ package be.kozmo.library_api;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.springframework.context.annotation.Import;
 
+/** Smoke test: the full application context starts against a real Postgres. */
 @SpringBootTest
-@Testcontainers
+@Import(TestcontainersConfiguration.class)
 class LibraryApiApplicationTests {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17");
 
 	@Test
 	void contextLoads() {
 	}
-
 }
