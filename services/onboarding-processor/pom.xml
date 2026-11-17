@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>be.onboarding</groupId>
+        <artifactId>onboarding-platform</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>onboarding-processor</artifactId>
+    <name>onboarding-processor</name>
+    <description>Azure Function that consumes ApplicationSubmitted events from Service Bus</description>
+
+    <properties>
+        <azure.functions.java.library.version>3.3.0</azure.functions.java.library.version>
+        <azure.functions.maven.plugin.version>1.42.0</azure.functions.maven.plugin.version>
+        <!-- Target of azure-functions:deploy. Must match the Terraform app stack. -->
+        <functionAppName>func-ivaninterview-dev-bec</functionAppName>
+        <functionResourceGroup>rg-ivaninterview-dev</functionResourceGroup>
+    </properties>
+
+    <dependencies>
+        <!-- Annotations (@FunctionName, @ServiceBusQueueTrigger) and ExecutionContext. -->
+        <dependency>
+            <groupId>com.microsoft.azure.functions</groupId>
+            <artifactId>azure-functions-java-library</artifactId>
+            <version>${azure.functions.java.library.version}</version>
+        </dependency>
+        <!-- JSON: Jackson 3, version managed by Spring Boot. java.time support is built in. -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              No spring-boot-maven-plugin here: a Function is deployed as a plain JAR plus a lib/ folder,
+              not as a fat JAR. This plugin generates function.json from the annotations during
+              'package' (into target/azure-functions/<appName>) and deploys with 'azure-functions:deploy'.
+            -->
+            <plugin>
+                <groupId>com.microsoft.azure</groupId>
+                <artifactId>azure-functions-maven-plugin</artifactId>
+                <version>${azure.functions.maven.plugin.version}</version>
+                <configuration>
+                    <appName>${functionAppName}</appName>
+                    <resourceGroup>${functionResourceGroup}</resourceGroup>
+                    <appServicePlanName>asp-ivaninterview-dev-bec</appServicePlanName>
+                    <region>belgiumcentral</region>
+                    <runtime>
+                        <os>linux</os>
+                        <javaVersion>21</javaVersion>
+                    </runtime>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>package-functions</id>
+                        <goals>
+                            <goal>package</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
