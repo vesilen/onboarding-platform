@@ -1,3 +1,7 @@
+# Foundation stack: resources that are KEPT overnight.
+# - User-assigned managed identity: same principal_id every day, so role assignments stay valid
+# - Key Vault + secret: avoids the soft-delete name lock on recreate (see README)
+
 data "azurerm_client_config" "current" {}
 
 data "azurerm_resource_group" "this" {
@@ -17,7 +21,12 @@ resource "azurerm_user_assigned_identity" "api" {
   location            = data.azurerm_resource_group.this.location
   resource_group_name = data.azurerm_resource_group.this.name
   tags                = local.tags
+
+  lifecycle {
+    prevent_destroy = true # remove this line before the final cleanup (expiry)
+  }
 }
+
 resource "azurerm_key_vault" "this" {
   name                       = "kv-${var.workload}-${var.environment}-${var.region_abbr}"
   location                   = data.azurerm_resource_group.this.location
@@ -28,6 +37,10 @@ resource "azurerm_key_vault" "this" {
   soft_delete_retention_days = 7
   purge_protection_enabled   = false # anders kan je niet purgen
   tags                       = local.tags
+
+  lifecycle {
+    prevent_destroy = true # remove this line before the final cleanup (expiry)
+  }
 }
 
 # Jijzelf (of wie terraform draait) mag secrets schrijven
@@ -35,6 +48,14 @@ resource "azurerm_role_assignment" "deployer_secrets_officer" {
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Secrets Officer"
   principal_id         = data.azurerm_client_config.current.object_id
+}
+
+# The app's managed identity may read secrets, nothing more.
+# Lives here (not in app/) because the identity is kept: the assignment survives the nightly destroy.
+resource "azurerm_role_assignment" "api_secrets_user" {
+  scope                = azurerm_key_vault.this.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.api.principal_id
 }
 
 resource "random_password" "kyc_api_key" {
@@ -48,52 +69,4 @@ resource "azurerm_key_vault_secret" "kyc_api_key" {
   key_vault_id = azurerm_key_vault.this.id
 
   depends_on = [azurerm_role_assignment.deployer_secrets_officer]
-}
-
-resource "azurerm_service_plan" "this" {
-  name                = "asp-${var.workload}-${var.environment}-${var.region_abbr}"
-  location            = data.azurerm_resource_group.this.location
-  resource_group_name = data.azurerm_resource_group.this.name
-  os_type             = "Linux"
-  sku_name            = "B1"
-  tags                = local.tags
-}
-
-resource "azurerm_linux_web_app" "api" {
-  name                = "app-${var.workload}-${var.environment}-${var.region_abbr}" # globally unique
-  location            = data.azurerm_resource_group.this.location
-  resource_group_name = data.azurerm_resource_group.this.name
-  service_plan_id     = azurerm_service_plan.this.id
-  https_only          = true
-  tags                = local.tags
-
-  identity {
-    type         = "UserAssigned"
-    identity_ids = [azurerm_user_assigned_identity.api.id]
-  }
-
-  site_config {
-    ftps_state                        = "Disabled"
-    health_check_path                 = "/actuator/health/readiness"
-    health_check_eviction_time_in_min = 2
-
-    application_stack {
-      java_server         = "JAVA" # Java SE: runs your Spring Boot JAR
-      java_server_version = "21"
-      java_version        = "21"
-    }
-  }
-
-  app_settings = {
-    KEYVAULT_ENABLED        = "true"
-    AZURE_KEYVAULT_ENDPOINT = azurerm_key_vault.this.vault_uri
-    AZURE_CLIENT_ID         = azurerm_user_assigned_identity.api.client_id
-  }
-}
-
-# The app's managed identity may read secrets, nothing more
-resource "azurerm_role_assignment" "api_secrets_user" {
-  scope                = azurerm_key_vault.this.id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.api.principal_id
 }
