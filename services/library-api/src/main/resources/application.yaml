@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: library-api
+  jpa:
+    hibernate:
+      ddl-auto: update   # creates/updates tables from @Entity classes; fine for learning, use Flyway later
+server:
+  port: 8081
