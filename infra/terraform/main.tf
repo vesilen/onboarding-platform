@@ -12,6 +12,12 @@ locals {
   }
 }
 
+resource "azurerm_user_assigned_identity" "api" {
+  name                = "id-${var.workload}-${var.environment}-${var.region_abbr}" # id-ivaninterview-dev-bec
+  location            = data.azurerm_resource_group.this.location
+  resource_group_name = data.azurerm_resource_group.this.name
+  tags                = local.tags
+}
 resource "azurerm_key_vault" "this" {
   name                       = "kv-${var.workload}-${var.environment}-${var.region_abbr}"
   location                   = data.azurerm_resource_group.this.location
@@ -62,7 +68,8 @@ resource "azurerm_linux_web_app" "api" {
   tags                = local.tags
 
   identity {
-    type = "SystemAssigned" # the managed identity
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.api.id]
   }
 
   site_config {
@@ -80,6 +87,7 @@ resource "azurerm_linux_web_app" "api" {
   app_settings = {
     KEYVAULT_ENABLED        = "true"
     AZURE_KEYVAULT_ENDPOINT = azurerm_key_vault.this.vault_uri
+    AZURE_CLIENT_ID         = azurerm_user_assigned_identity.api.client_id
   }
 }
 
@@ -87,5 +95,5 @@ resource "azurerm_linux_web_app" "api" {
 resource "azurerm_role_assignment" "api_secrets_user" {
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_linux_web_app.api.identity[0].principal_id
+  principal_id         = azurerm_user_assigned_identity.api.principal_id
 }
