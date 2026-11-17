@@ -21,6 +21,7 @@
 
     <modules>
         <module>services/onboarding-api</module>
+        <module>services/library-api</module>
     </modules>
 
     <properties>
