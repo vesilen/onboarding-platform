@@ -16,7 +16,7 @@ terraform {
 provider "azurerm" {
   features {
     key_vault {
-      purge_soft_delete_on_destroy    = false  # destroy -> naam meteen weer vrij
+      purge_soft_delete_on_destroy    = false # destroy -> naam meteen weer vrij
       recover_soft_deleted_key_vaults = false # geen oude vault (met oude secrets) terughalen
     }
   }
