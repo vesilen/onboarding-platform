@@ -8,6 +8,14 @@ spring:
           property-source-enabled: ${KEYVAULT_ENABLED:false}
           property-sources:
             - endpoint: ${AZURE_KEYVAULT_ENDPOINT:}
+      servicebus:
+        # Off by default (local runs, CI, tests): LoggingEventPublisher is used instead.
+        # In Azure, Terraform sets SERVICEBUS_ENABLED=true and the namespace/queue app settings.
+        enabled: ${SERVICEBUS_ENABLED:false}
+        namespace: ${SERVICEBUS_NAMESPACE:}          # name only, e.g. sb-ivaninterview-dev-bec
+        producer:                                    # sender only: the API must not receive
+          entity-name: ${SERVICEBUS_QUEUE:application-submitted}
+          entity-type: queue
 
 onboarding:
   kyc:

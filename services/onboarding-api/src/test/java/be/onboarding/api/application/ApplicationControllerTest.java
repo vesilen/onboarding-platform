@@ -48,4 +48,19 @@ class ApplicationControllerTest {
 
         verify(applicationService).submit(new ApplicationRequest("Ada", "Lovelace", "ada@example.com"));
     }
+
+    @Test
+    void submitReturnsServiceUnavailableWhenTheEventCannotBePublished() throws Exception {
+        when(applicationService.submit(any()))
+                .thenThrow(new EventPublicationException("down", new RuntimeException()));
+
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName": "Ada", "lastName": "Lovelace", "email": "ada@example.com"}
+                                """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.detail").exists());
+    }
 }
