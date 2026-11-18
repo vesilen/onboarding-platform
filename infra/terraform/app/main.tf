@@ -18,6 +18,11 @@ data "azurerm_user_assigned_identity" "func" {
   resource_group_name = data.azurerm_resource_group.this.name
 }
 
+data "azurerm_application_insights" "this" {
+  name                = "appi-${var.workload}-${var.environment}-${var.region_abbr}"
+  resource_group_name = data.azurerm_resource_group.this.name
+}
+
 data "azurerm_key_vault" "this" {
   name                = "kv-${var.workload}-${var.environment}-${var.region_abbr}"
   resource_group_name = data.azurerm_resource_group.this.name
@@ -72,6 +77,12 @@ resource "azurerm_linux_web_app" "api" {
     SERVICEBUS_ENABLED      = "true"
     SERVICEBUS_NAMESPACE    = azurerm_servicebus_namespace.this.name
     SERVICEBUS_QUEUE        = azurerm_servicebus_queue.application_submitted.name
+
+    # Application Insights Java agent, attached by App Service at JVM start: no code change.
+    ApplicationInsightsAgent_EXTENSION_VERSION        = "~3"
+    APPLICATIONINSIGHTS_CONNECTION_STRING             = data.azurerm_application_insights.this.connection_string
+    APPLICATIONINSIGHTS_AUTHENTICATION_STRING         = "Authorization=AAD;ClientId=${data.azurerm_user_assigned_identity.api.client_id}"
+    APPLICATIONINSIGHTS_INSTRUMENTATION_LOGGING_LEVEL = "INFO" # logs sent to App Insights; WARN if volume grows
   }
 }
 
@@ -168,6 +179,8 @@ resource "azurerm_linux_function_app" "processor" {
     always_on  = true # on a dedicated plan the Service Bus trigger stops listening without it
     ftps_state = "Disabled"
 
+    application_insights_connection_string = data.azurerm_application_insights.this.connection_string
+
     application_stack {
       java_version = "21"
     }
@@ -184,6 +197,17 @@ resource "azurerm_linux_function_app" "processor" {
     ServiceBusConnection__clientId                = data.azurerm_user_assigned_identity.func.client_id
 
     SERVICEBUS_QUEUE = azurerm_servicebus_queue.application_submitted.name
+
+    # Application Insights: log in with the identity (local auth is disabled on the resource), and
+    # enable the Java agent for dependency tracking (Service Bus calls, end-to-end transactions).
+    APPLICATIONINSIGHTS_AUTHENTICATION_STRING = "Authorization=AAD;ClientId=${data.azurerm_user_assigned_identity.func.client_id}"
+    APPLICATIONINSIGHTS_ENABLE_AGENT          = "true"
+  }
+
+  lifecycle {
+    # Set by 'azure-functions:deploy' and points to the deployed code package. Without this, every apply
+    # that changes app_settings removes it and the host runs with no functions (messages stay in the queue).
+    ignore_changes = [app_settings["WEBSITE_RUN_FROM_PACKAGE"]]
   }
 
   # Give the role assignments a head start before the runtime first touches storage and the queue.

@@ -9,7 +9,7 @@ The code is split into two independent root modules, each with its own state:
 
 | Stack | Lifecycle | Contents |
 |---|---|---|
-| `foundation/` | **Kept** (until `expiry`) | Managed identities, Key Vault, secret, Key Vault role assignments |
+| `foundation/` | **Kept** (until `expiry`) | Managed identities, Key Vault, secret, Log Analytics, Application Insights, their role assignments |
 | `app/` | **Destroyed nightly** | App Service plan, web app, Function App + storage, Service Bus namespace + queue, Service Bus role assignments |
 
 Why this split:
@@ -35,6 +35,9 @@ Why this split:
 | foundation | Role assignment | Key Vault Secrets Officer | Whoever runs Terraform may write secrets |
 | foundation | Role assignment | Key Vault Secrets User | The API's managed identity may read secrets |
 | foundation | User-assigned identity | `id-ivaninterview-func-dev-bec` | Identity of the Function, survives the nightly destroy |
+| foundation | Log Analytics workspace | `log-ivaninterview-dev-bec` | Stores the telemetry; 30 days retention, **daily cap 0.1 GB** |
+| foundation | Application Insights | `appi-ivaninterview-dev-bec` | Workspace-based, local auth disabled (Entra ID ingestion only) |
+| foundation | Role assignment | Monitoring Metrics Publisher (2x) | The API and Function identities may send telemetry |
 | app | App Service plan | `asp-ivaninterview-dev-bec` | Linux, B1 |
 | app | Web app | `app-ivaninterview-dev-bec` | Runs `onboarding-api` as a Java 21 JAR with the user-assigned identity |
 | app | Service Bus namespace | `sb-ivaninterview-dev-bec` | Standard tier, SAS keys disabled (Entra ID only) |
@@ -59,6 +62,20 @@ All resources carry the mandatory i8c tags `owner`, `purpose` and `expiry`.
   - **in Azure**: the user-assigned managed identity (`AZURE_CLIENT_ID` tells it which one);
   - **locally**: your `az login` session (stored in `%USERPROFILE%\.azure`, shared by all terminals).
 - Without `KEYVAULT_ENABLED=true` (CI, unit tests) Key Vault is not contacted at all.
+
+## How the apps reach Application Insights
+
+- No code change: the app stack only sets app settings.
+  - **Web app (API)**: `ApplicationInsightsAgent_EXTENSION_VERSION=~3` makes App Service attach the
+    Application Insights Java agent; it collects requests, dependencies (Service Bus, Key Vault),
+    exceptions and logs from `INFO` (`APPLICATIONINSIGHTS_INSTRUMENTATION_LOGGING_LEVEL`).
+  - **Function**: `application_insights_connection_string` in `site_config`; the Functions host sends logs
+    and invocations (levels from `host.json`). `APPLICATIONINSIGHTS_ENABLE_AGENT=true` adds dependency tracking.
+- Local auth is disabled on Application Insights, so the connection string alone is not enough:
+  `APPLICATIONINSIGHTS_AUTHENTICATION_STRING=Authorization=AAD;ClientId=<identity client id>` makes each app
+  authenticate with its managed identity, which has *Monitoring Metrics Publisher*.
+- Cost: pay per GB ingested; the workspace's daily cap (0.1 GB) stops collection for the rest of the day.
+  Check *Log Analytics workspace -> Usage and estimated costs*.
 
 ## How the API reaches Service Bus
 
@@ -157,6 +174,9 @@ sync with reality and the next `apply` is predictable.
 | `AuthorizationFailed ... deletedVaults/read` | Purge needs subscription-level rights | Ask the subscription owner, or avoid purging |
 | 401/403 from Service Bus or Function storage right after the morning `apply` | Recreated role assignments not active yet | Wait a few minutes, `az webapp restart` / `az functionapp restart` |
 | Namespace name already in use on `apply` | Name not released yet right after a destroy | Wait a few minutes, `apply` again |
+| No data in Application Insights right after `apply` | Monitoring Metrics Publisher not active yet, or app not restarted | Wait a few minutes, restart the app |
+| Telemetry stops during the day | Daily cap of 0.1 GB reached | Check *Usage and estimated costs*; lower log levels or raise `daily_quota_gb` |
+| Function stops picking up messages after an `app apply` (messages stay in the queue, no functions listed) | Terraform removed the `WEBSITE_RUN_FROM_PACKAGE` setting written by `azure-functions:deploy` | Redeploy the Function; `ignore_changes` on that setting prevents it |
 | Function does not pick up messages | Always On off, or the JAR was not redeployed after the recreate | Check `always_on`, redeploy the Function |
 
 ## Planned

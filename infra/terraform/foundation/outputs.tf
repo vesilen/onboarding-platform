@@ -9,3 +9,7 @@ output "identity_client_id" {
 output "func_identity_client_id" {
   value = azurerm_user_assigned_identity.func.client_id
 }
+
+output "application_insights_name" {
+  value = azurerm_application_insights.this.name
+}
