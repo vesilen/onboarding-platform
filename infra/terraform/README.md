@@ -60,6 +60,16 @@ All resources carry the mandatory i8c tags `owner`, `purpose` and `expiry`.
   - **locally**: your `az login` session (stored in `%USERPROFILE%\.azure`, shared by all terminals).
 - Without `KEYVAULT_ENABLED=true` (CI, unit tests) Key Vault is not contacted at all.
 
+## How the API reaches Service Bus
+
+- Terraform sets `SERVICEBUS_ENABLED=true`, `SERVICEBUS_NAMESPACE=sb-ivaninterview-dev-bec` and
+  `SERVICEBUS_QUEUE=application-submitted` on the web app; `application.yml` maps them to
+  `spring.cloud.azure.servicebus.*`.
+- Same credential chain as Key Vault: the managed identity in Azure (`AZURE_CLIENT_ID`), `az login` locally.
+  The namespace has SAS keys disabled, so there is no connection string anywhere.
+- The API identity only has *Azure Service Bus Data Sender* on the queue: it can send, not receive.
+- Without `SERVICEBUS_ENABLED=true` (CI, unit tests) a logging publisher is used and Service Bus is not contacted.
+
 ## Usage
 
 Prerequisites: Terraform >= 1.9, Azure CLI logged in to the CodeBaseX tenant.

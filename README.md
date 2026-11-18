@@ -41,6 +41,18 @@ curl -i -X POST http://localhost:8080/api/v1/applications \
 curl http://localhost:8080/actuator/health
 ```
 
+The POST returns `202 Accepted` with an `applicationId` and publishes an `ApplicationSubmitted` event.
+Locally Service Bus is off by default and the event is only logged. To publish to the real queue
+(uses your `az login`, which has *Azure Service Bus Data Owner* on the namespace):
+
+```bash
+SERVICEBUS_ENABLED=true SERVICEBUS_NAMESPACE=sb-ivaninterview-dev-bec \
+./mvnw -pl services/onboarding-api spring-boot:run
+```
+
+In Azure the event is consumed by `onboarding-processor`, which logs `Processed application <id>`.
+If the event cannot be published, the API returns `503 Service Unavailable` and the caller should retry.
+
 Coverage report: `services/onboarding-api/target/site/jacoco/index.html`.
 
 ## CI/CD
