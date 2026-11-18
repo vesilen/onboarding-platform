@@ -21,6 +21,7 @@ Thumbs.db
 .env
 *.local.yml
 application-local.yml
+local.settings.json
 
 # Terraform
 **/.terraform/*

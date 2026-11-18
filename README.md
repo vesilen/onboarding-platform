@@ -15,6 +15,7 @@ Azure Service Bus, resiliency, observability, security, Terraform and CI/CD.
 | Path | Contents |
 |---|---|
 | `services/onboarding-api` | Entry point for onboarding applications (web, mobile, partners) |
+| `services/onboarding-processor` | Azure Function that consumes `ApplicationSubmitted` events from Service Bus |
 | `simulators/` | Stubs of external systems (KYC, credit bureau, core banking, e-signing) – coming |
 | `infra/terraform/` | Azure infrastructure as code – coming |
 | `docs/adr/` | Architecture decision records |
