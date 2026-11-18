@@ -84,3 +84,43 @@ resource "azurerm_user_assigned_identity" "func" {
     prevent_destroy = true # remove this line before the final cleanup (expiry)
   }
 }
+
+# ---------------------------------------------------------------------------
+# Monitoring: Log Analytics + Application Insights
+# Kept overnight: free when idle, logs survive the nightly destroy of app/, and the role
+# assignments below stay valid because the identities are kept too.
+# ---------------------------------------------------------------------------
+
+resource "azurerm_log_analytics_workspace" "this" {
+  name                = "log-${var.workload}-${var.environment}-${var.region_abbr}" # log-ivaninterview-dev-bec
+  location            = data.azurerm_resource_group.this.location
+  resource_group_name = data.azurerm_resource_group.this.name
+  sku                 = "PerGB2018" # pay per GB ingested
+  retention_in_days   = 30          # included in the price
+  daily_quota_gb      = 0.1         # cost cap: collection stops for the rest of the day above 0.1 GB
+  tags                = local.tags
+}
+
+resource "azurerm_application_insights" "this" {
+  name                = "appi-${var.workload}-${var.environment}-${var.region_abbr}" # appi-ivaninterview-dev-bec
+  location            = data.azurerm_resource_group.this.location
+  resource_group_name = data.azurerm_resource_group.this.name
+  workspace_id        = azurerm_log_analytics_workspace.this.id
+  application_type    = "java"
+  # Only Entra ID (managed identity) may send telemetry; the connection string alone is not enough.
+  local_authentication_enabled = false
+  tags                         = local.tags
+}
+
+# Entra ID ingestion requires this role on the Application Insights resource.
+resource "azurerm_role_assignment" "api_appi_publisher" {
+  scope                = azurerm_application_insights.this.id
+  role_definition_name = "Monitoring Metrics Publisher"
+  principal_id         = azurerm_user_assigned_identity.api.principal_id
+}
+
+resource "azurerm_role_assignment" "func_appi_publisher" {
+  scope                = azurerm_application_insights.this.id
+  role_definition_name = "Monitoring Metrics Publisher"
+  principal_id         = azurerm_user_assigned_identity.func.principal_id
+}

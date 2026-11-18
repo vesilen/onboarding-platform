@@ -15,6 +15,7 @@
     "logLevel": {
       "default": "Information",
       "Azure.Core": "Warning",
+      "Azure.Identity": "Warning",
       "Azure.Messaging.ServiceBus": "Warning",
       "Function": "Information"
     }
