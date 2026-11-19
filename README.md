@@ -16,6 +16,7 @@ Azure Service Bus, resiliency, observability, security, Terraform and CI/CD.
 |---|---|
 | `services/onboarding-api` | Entry point for onboarding applications (web, mobile, partners) |
 | `services/onboarding-processor` | Azure Function that consumes `ApplicationSubmitted` events from Service Bus |
+| `services/library-api` | Book catalogue CRUD API on Postgres (Flyway) with a transactional outbox for book events |
 | `simulators/` | Stubs of external systems (KYC, credit bureau, core banking, e-signing) – coming |
 | `infra/terraform/` | Azure infrastructure as code – coming |
 | `docs/adr/` | Architecture decision records |
@@ -54,6 +55,47 @@ In Azure the event is consumed by `onboarding-processor`, which logs `Processed 
 If the event cannot be published, the API returns `503 Service Unavailable` and the caller should retry.
 
 Coverage report: `services/onboarding-api/target/site/jacoco/index.html`.
+
+### library-api
+
+Spring Boot starts a local Postgres 17 container from `services/library-api/compose.yaml`, and Flyway
+creates the schema from `src/main/resources/db/migration`.
+
+```bash
+./mvnw -pl services/library-api spring-boot:run   # start the API on http://localhost:8081
+```
+
+Try it with [`services/library-api/library-api.http`](services/library-api/library-api.http)
+(run the requests from IntelliJ or VS Code REST Client), or with curl:
+
+```bash
+curl -i -X POST http://localhost:8081/api/v1/books \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Dune","author":"Frank Herbert","isbn":"9780441013593","publishedYear":1965}'
+
+curl http://localhost:8081/api/v1/books
+```
+
+Every create, update and delete also writes a `BookCreated`, `BookUpdated` or `BookDeleted` event to the
+`outbox_events` table, in the same transaction as the change to `books`. A failed change (for example a
+duplicate ISBN) leaves neither a book nor an event. To look at the tables while the app is running:
+
+```bash
+cd services/library-api
+docker compose exec postgres psql -U library -d library
+```
+
+```sql
+SELECT * FROM books;
+SELECT event_type, aggregate_id, payload, published_at FROM outbox_events ORDER BY created_at;
+SELECT version, description, success FROM flyway_schema_history;
+```
+
+`published_at` stays empty until the outbox relay is added.
+
+If Flyway refuses to start with *non-empty schema without schema history table*, the container still has
+tables that Hibernate created before Flyway was introduced: run `docker compose down` in
+`services/library-api` once (the local data is thrown away).
 
 ## CI/CD
 

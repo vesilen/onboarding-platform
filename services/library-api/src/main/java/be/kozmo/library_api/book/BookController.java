@@ -12,51 +12,42 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
-/** CRUD endpoints for books. */
+/** CRUD endpoints for books. Only HTTP concerns here; the logic lives in BookService. */
 @RestController
 @RequestMapping("/api/v1/books")
 public class BookController {
 
-	private final BookRepository bookRepository;
+	private final BookService bookService;
 
-	public BookController(BookRepository bookRepository) {
-		this.bookRepository = bookRepository;
+	public BookController(BookService bookService) {
+		this.bookService = bookService;
 	}
 
 	@GetMapping
 	public List<BookDto> findAll() {
-		List<Book> books = bookRepository.findAll();
-		return books.stream().map(BookDto::from).toList();
+		return bookService.findAll();
 	}
 
 	@GetMapping("/{id}")
 	public BookDto findById(@PathVariable Long id) {
-		return BookDto.from(getBookOrThrow(id));
+		return bookService.findById(id);
 	}
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	public BookDto create(@RequestBody BookDto request) {
-		return BookDto.from(bookRepository.save(request.toEntity()));
+		return bookService.create(request);
 	}
 
 	@PutMapping("/{id}")
 	public BookDto update(@PathVariable Long id, @RequestBody BookDto request) {
-		Book book = getBookOrThrow(id);
-		request.applyTo(book);
-		return BookDto.from(bookRepository.save(book));
+		return bookService.update(id, request);
 	}
 
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@PathVariable Long id) {
-		bookRepository.delete(getBookOrThrow(id));
-	}
-
-	private Book getBookOrThrow(Long id) {
-		return bookRepository.findById(id)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Book " + id + " not found"));
+		bookService.delete(id);
 	}
 }

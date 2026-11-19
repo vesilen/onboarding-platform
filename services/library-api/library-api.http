@@ -1,0 +1,41 @@
+# Requests for a locally running library-api (./mvnw -pl services/library-api spring-boot:run).
+# Run them with the ▶ icon in IntelliJ, or with the REST Client extension in VS Code.
+# Check the outbox_events table after each change (see README, section library-api).
+
+@baseUrl = http://localhost:8081/api/v1/books
+
+### Create a book (adds a BookCreated event)
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"title": "Dune", "author": "Frank Herbert", "isbn": "9780441013593", "publishedYear": 1965}
+
+### Create a second book
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"title": "Neuromancer", "author": "William Gibson", "isbn": "9780441569595", "publishedYear": 1984}
+
+### Same ISBN again: fails, and neither a book nor an event is saved
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"title": "Copy", "author": "Someone", "isbn": "9780441013593", "publishedYear": 2000}
+
+### All books
+GET {{baseUrl}}
+
+### One book (use an id returned above)
+GET {{baseUrl}}/1
+
+### Unknown book: 404
+GET {{baseUrl}}/999
+
+### Update a book (adds a BookUpdated event)
+PUT {{baseUrl}}/1
+Content-Type: application/json
+
+{"title": "Dune (reissue)", "author": "Frank Herbert", "isbn": "9780441013593", "publishedYear": 2015}
+
+### Delete a book (adds a BookDeleted event)
+DELETE {{baseUrl}}/1
