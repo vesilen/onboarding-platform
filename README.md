@@ -91,7 +91,16 @@ SELECT event_type, aggregate_id, payload, published_at FROM outbox_events ORDER 
 SELECT version, description, success FROM flyway_schema_history;
 ```
 
-`published_at` stays empty until the outbox relay is added.
+A scheduled relay (`OutboxRelay`, every 5 seconds) picks up unpublished events, hands them to the
+publisher and fills in `published_at`. Locally Service Bus is off, so the publisher only logs:
+
+```
+Service Bus disabled, not publishing BookCreated for Book 1 (event 6f1c…): {"id": 1, "title": "Dune", …}
+```
+
+Delivery is at-least-once: an event can be sent again if the app stops between publishing and marking it
+published, so consumers must ignore duplicates (the event id becomes the message id). The relay is
+configured under `outbox.relay` in `application.yaml` (`enabled`, `fixed-delay`, `batch-size`).
 
 If Flyway refuses to start with *non-empty schema without schema history table*, the container still has
 tables that Hibernate created before Flyway was introduced: run `docker compose down` in

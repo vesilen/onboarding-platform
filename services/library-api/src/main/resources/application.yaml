@@ -8,3 +8,8 @@ spring:
     locations: classpath:db/migration   # the default, written out so it is easy to find
 server:
   port: 8081
+outbox:
+  relay:
+    enabled: true        # false = no scheduled relay (tests call OutboxRelay.publishPending() themselves)
+    fixed-delay: 5s      # pause between two relay runs
+    batch-size: 50       # max events per run

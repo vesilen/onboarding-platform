@@ -21,7 +21,7 @@ import be.kozmo.library_api.outbox.OutboxEventRepository;
  * a book change and its event are committed together, or not at all.
  * No @Transactional on the test on purpose: every service call commits for real, as in production.
  */
-@SpringBootTest
+@SpringBootTest(properties = "outbox.relay.enabled=false") // the relay would mark events published mid-test
 @Import(TestcontainersConfiguration.class)
 class BookServiceTest {
 
