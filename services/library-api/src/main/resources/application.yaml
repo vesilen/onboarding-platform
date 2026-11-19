@@ -3,6 +3,8 @@ spring:
     name: library-api
   jpa:
     hibernate:
-      ddl-auto: update   # creates/updates tables from @Entity classes; fine for learning, use Flyway later
+      ddl-auto: validate   # Flyway owns the schema; Hibernate only checks that the entities match it
+  flyway:
+    locations: classpath:db/migration   # the default, written out so it is easy to find
 server:
   port: 8081

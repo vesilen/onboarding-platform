@@ -1,7 +1,8 @@
 package be.kozmo.library_api.book;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -12,7 +13,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,11 +20,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-/** Web-layer test: the repository is mocked with Mockito, so only HTTP mapping and JSON are tested. */
+/** Web-layer test: the service is mocked with Mockito, so only HTTP mapping and JSON are tested. */
 @ExtendWith(MockitoExtension.class)
 class BookControllerTest {
 
@@ -32,21 +31,23 @@ class BookControllerTest {
 			{"title": "Dune", "author": "Frank Herbert", "isbn": "9780441013593", "publishedYear": 1965}
 			""";
 
+	private static final BookDto DUNE = new BookDto(1L, "Dune", "Frank Herbert", "9780441013593", 1965);
+
 	@Mock
-	private BookRepository bookRepository;
+	private BookService bookService;
 
 	private MockMvc mockMvc;
 
 	@BeforeEach
 	void setUp() {
-		mockMvc = MockMvcBuilders.standaloneSetup(new BookController(bookRepository)).build();
+		mockMvc = MockMvcBuilders.standaloneSetup(new BookController(bookService)).build();
 	}
 
 	@Test
 	void findAllReturnsEveryBook() throws Exception {
-		when(bookRepository.findAll()).thenReturn(List.of(
-				book(1L, "Dune", "Frank Herbert"),
-				book(2L, "Neuromancer", "William Gibson")));
+		when(bookService.findAll()).thenReturn(List.of(
+				DUNE,
+				new BookDto(2L, "Neuromancer", "William Gibson", null, null)));
 
 		mockMvc.perform(get("/api/v1/books"))
 				.andExpect(status().isOk())
@@ -58,7 +59,7 @@ class BookControllerTest {
 
 	@Test
 	void findByIdReturnsTheBook() throws Exception {
-		when(bookRepository.findById(1L)).thenReturn(Optional.of(book(1L, "Dune", "Frank Herbert")));
+		when(bookService.findById(1L)).thenReturn(DUNE);
 
 		mockMvc.perform(get("/api/v1/books/1"))
 				.andExpect(status().isOk())
@@ -69,19 +70,16 @@ class BookControllerTest {
 
 	@Test
 	void findByIdReturnsNotFoundForUnknownBook() throws Exception {
-		when(bookRepository.findById(42L)).thenReturn(Optional.empty());
+		when(bookService.findById(42L)).thenThrow(new BookNotFoundException(42L));
 
 		mockMvc.perform(get("/api/v1/books/42"))
 				.andExpect(status().isNotFound());
 	}
 
 	@Test
-	void createSavesTheBookAndReturnsCreated() throws Exception {
-		when(bookRepository.save(any(Book.class))).thenAnswer(invocation -> {
-			Book saved = invocation.getArgument(0);
-			ReflectionTestUtils.setField(saved, "id", 7L); // what the database would do
-			return saved;
-		});
+	void createReturnsCreatedWithTheSavedBook() throws Exception {
+		when(bookService.create(any(BookDto.class)))
+				.thenReturn(new BookDto(7L, "Dune", "Frank Herbert", "9780441013593", 1965));
 
 		mockMvc.perform(post("/api/v1/books")
 						.contentType(MediaType.APPLICATION_JSON)
@@ -94,9 +92,8 @@ class BookControllerTest {
 	}
 
 	@Test
-	void updateChangesTheExistingBook() throws Exception {
-		when(bookRepository.findById(1L)).thenReturn(Optional.of(book(1L, "Old title", "Old author")));
-		when(bookRepository.save(any(Book.class))).thenAnswer(invocation -> invocation.getArgument(0));
+	void updateReturnsTheUpdatedBook() throws Exception {
+		when(bookService.update(eq(1L), any(BookDto.class))).thenReturn(DUNE);
 
 		mockMvc.perform(put("/api/v1/books/1")
 						.contentType(MediaType.APPLICATION_JSON)
@@ -109,40 +106,27 @@ class BookControllerTest {
 
 	@Test
 	void updateReturnsNotFoundForUnknownBook() throws Exception {
-		when(bookRepository.findById(42L)).thenReturn(Optional.empty());
+		when(bookService.update(eq(42L), any(BookDto.class))).thenThrow(new BookNotFoundException(42L));
 
 		mockMvc.perform(put("/api/v1/books/42")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(BOOK_JSON))
 				.andExpect(status().isNotFound());
-
-		verify(bookRepository, never()).save(any());
 	}
 
 	@Test
-	void deleteRemovesTheBook() throws Exception {
-		Book book = book(1L, "Dune", "Frank Herbert");
-		when(bookRepository.findById(1L)).thenReturn(Optional.of(book));
-
+	void deleteReturnsNoContent() throws Exception {
 		mockMvc.perform(delete("/api/v1/books/1"))
 				.andExpect(status().isNoContent());
 
-		verify(bookRepository).delete(book);
+		verify(bookService).delete(1L);
 	}
 
 	@Test
 	void deleteReturnsNotFoundForUnknownBook() throws Exception {
-		when(bookRepository.findById(42L)).thenReturn(Optional.empty());
+		doThrow(new BookNotFoundException(42L)).when(bookService).delete(42L);
 
 		mockMvc.perform(delete("/api/v1/books/42"))
 				.andExpect(status().isNotFound());
-
-		verify(bookRepository, never()).delete(any());
-	}
-
-	private static Book book(Long id, String title, String author) {
-		Book book = new Book(title, author, null, null);
-		ReflectionTestUtils.setField(book, "id", id);
-		return book;
 	}
 }
