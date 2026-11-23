@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 0 # full history: SonarCloud needs it for blame / new-code detection
 
       - name: Set up Java 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
